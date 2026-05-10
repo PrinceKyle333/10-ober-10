@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CoinSight — 10 Peso Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Archivo:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:       #0d0d0b;
+    --bg2:      #111109;
+    --panel:    #151510;
+    --border:   rgba(196,156,40,.18);
+    --gold:     #c49c28;
+    --gold2:    #f0c842;
+    --gold-dim: rgba(196,156,40,.12);
+    --text:     #d4c89a;
+    --muted:    #6b6240;
+    --new:      #4ade80;
+    --old:      #60a5fa;
+    --radius:   14px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Archivo', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: .5;
+  }
+
+  /* ── Radial glow ── */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -20%; left: 50%;
+    transform: translateX(-50%);
+    width: 900px; height: 500px;
+    background: radial-gradient(ellipse, rgba(196,156,40,.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    height: 64px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-coin {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--gold);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    position: relative;
+    animation: coin-spin 8s linear infinite;
+  }
+
+  @keyframes coin-spin {
+    0%   { box-shadow: 0 0 0 0 rgba(196,156,40,.3); }
+    50%  { box-shadow: 0 0 16px 4px rgba(196,156,40,.15); }
+    100% { box-shadow: 0 0 0 0 rgba(196,156,40,.3); }
+  }
+
+  .logo-coin::before {
+    content: '₱';
+    font-family: 'Syne', sans-serif;
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+    gap: 2px;
+  }
+
+  .logo-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--gold2);
+    letter-spacing: -.02em;
+  }
+
+  .logo-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: .62rem;
+    color: var(--muted);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .mode-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .08em;
+    padding: 5px 14px;
+    border-radius: 100px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .mode-badge.demo {
+    background: rgba(196,156,40,.1);
+    border: 1px solid rgba(196,156,40,.3);
+    color: var(--gold);
+  }
+
+  .mode-badge.live {
+    background: rgba(74,222,128,.08);
+    border: 1px solid rgba(74,222,128,.25);
+    color: var(--new);
+  }
+
+  .mode-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    animation: blink 2s infinite;
+  }
+
+  .mode-badge.demo .dot { background: var(--gold); }
+  .mode-badge.live .dot { background: var(--new); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── Main layout ── */
+  main {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 40px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media(max-width:900px) {
+    main { grid-template-columns: 1fr; padding: 20px; }
+  }
+
+  /* ── Mode tabs ── */
+  .mode-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  .mode-tab {
+    padding: 14px 24px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    position: relative;
+  }
+
+  .mode-tab:hover {
+    color: var(--gold);
+  }
+
+  .mode-tab.active {
+    color: var(--gold2);
+    border-bottom-color: var(--gold);
+  }
+
+  /* ── Drop zone ── */
+  .upload-area {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .25s, background .25s;
+    width: 100%;
+  }
+
+  .upload-area:hover, .upload-area.drag-over {
+    border-color: var(--gold);
+    background: rgba(196,156,40,.04);
+  }
+
+  .upload-area input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  #upload-area-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Corner decorations */
+  .upload-area::before,
+  .upload-area::after {
+    content: '';
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: var(--gold);
+    border-style: solid;
+    opacity: .5;
+  }
+
+  .upload-area::before { top: 16px; left: 16px; border-width: 1.5px 0 0 1.5px; }
+  .upload-area::after  { bottom: 16px; right: 16px; border-width: 0 1.5px 1.5px 0; }
+
+  /* Upload idle state */
+  #idle-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .coin-icon {
+    width: 80px; height: 80px;
+    border: 1.5px dashed var(--gold);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    position: relative;
+    animation: rotate-dash 20s linear infinite;
+  }
+
+  @keyframes rotate-dash {
+    to { transform: rotate(360deg); }
+  }
+
+  .coin-icon::after {
+    content: '₱10';
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    animation: rotate-dash 20s linear infinite reverse;
+  }
+
+  #idle-state h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  #idle-state p {
+    font-size: .82rem;
+    color: var(--muted);
+  }
+
+  #idle-state .browse-link {
+    color: var(--gold);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+
+  .formats {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .formats span {
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .08em;
+  }
+
+  .formats span::before { content: '·'; margin-right: 6px; color: var(--border); }
+  .formats span:first-child::before { display: none; }
+
+  /* Result image */
+  #result-state { display: none; width: 100%; }
+
+  #result-img {
+    width: 100%;
+    display: block;
+    border-radius: 12px;
+  }
+
+  /* Video preview */
+  #video-preview {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+  }
+
+  /* Camera stream canvas */
+  #camera-canvas {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+  }
+
+  .camera-controls {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-camera {
+    flex: 1;
+    padding: 10px 16px;
+    background: rgba(74,222,128,.1);
+    border: 1px solid rgba(74,222,128,.3);
+    color: var(--new);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .06em;
+    transition: all .2s;
+  }
+
+  .btn-camera:hover {
+    background: rgba(74,222,128,.2);
+    border-color: rgba(74,222,128,.5);
+  }
+
+  .btn-camera.stop {
+    background: rgba(239,68,68,.1);
+    border-color: rgba(239,68,68,.3);
+    color: #ef4444;
+  }
+
+  .btn-camera.stop:hover {
+    background: rgba(239,68,68,.2);
+    border-color: rgba(239,68,68,.5);
+  }
+
+  .video-info {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    color: var(--muted);
+  }
+
+  .video-progress {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--gold);
+    transition: width .3s ease;
+  }
+
+  .result-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .result-bar-info {
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem;
+    color: var(--muted);
+  }
+
+  .result-bar-info strong { color: var(--gold); }
+
+  .btn-clear {
+    font-family: 'DM Mono', monospace;
+    font-size: .7rem;
+    letter-spacing: .06em;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .btn-clear:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Loading overlay */
+  #loading-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(13,13,11,.85);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 5;
+    border-radius: var(--radius);
+  }
+
+  #loading-overlay.active { display: flex; }
+
+  .spinner-ring {
+    width: 56px; height: 56px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loading-overlay p {
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    color: var(--gold);
+    letter-spacing: .1em;
+    animation: blink 1.5s infinite;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  /* Hide detections panel */
+  .sidebar > .panel:first-child {
+    display: none;
+  }
+
+  .panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .panel-count {
+    font-family: 'Syne', sans-serif;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--gold);
+    background: var(--gold-dim);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Detection cards */
+  #detections-list {
+    display: none;
+    padding: 14px;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 120px;
+  }
+
+  .det-placeholder {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 100px;
+    color: var(--muted);
+    font-size: .8rem;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .det-placeholder::before {
+    content: '○';
+    font-size: 1.5rem;
+    opacity: .3;
+  }
+
+  .det-card {
+    display: none;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    align-items: center;
+    gap: 14px;
+    animation: slide-in .25s ease;
+  }
+
+  @keyframes slide-in {
+    from { opacity:0; transform:translateY(6px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .det-card.new-coin { border-left: 3px solid var(--new); }
+  .det-card.old-coin { border-left: 3px solid var(--old); }
+
+  .det-coin-icon {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: 'Syne', sans-serif;
+    font-size: .7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .det-card.new-coin .det-coin-icon {
+    background: rgba(74,222,128,.1);
+    border: 1px solid rgba(74,222,128,.3);
+    color: var(--new);
+  }
+
+  .det-card.old-coin .det-coin-icon {
+    background: rgba(96,165,250,.1);
+    border: 1px solid rgba(96,165,250,.3);
+    color: var(--old);
+  }
+
+  .det-info { flex: 1; min-width: 0; }
+
+  .det-label {
+    font-family: 'Syne', sans-serif;
+    font-size: .85rem;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .det-conf-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .det-conf-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .det-conf-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+
+  .det-card.new-coin .det-conf-fill { background: var(--new); }
+  .det-card.old-coin .det-conf-fill { background: var(--old); }
+
+  .det-conf-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: .68rem;
+    color: var(--muted);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .det-bbox {
+    font-family: 'DM Mono', monospace;
+    font-size: .6rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Stats panel */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  .stat-cell {
+    background: var(--panel);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: .6rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--gold2);
+    line-height: 1;
+  }
+
+  .stat-value.small {
+    font-size: 1rem;
+  }
+
+  /* Model info */
+  .info-rows { padding: 4px 0; }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    border-top: 1px solid rgba(196,156,40,.07);
+    font-size: .8rem;
+  }
+
+  .info-row:first-child { border-top: none; }
+  .info-key  { color: var(--muted); font-size: .75rem; }
+  .info-val  { font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--text); }
+
+  /* ── Footer ── */
+  footer {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .06em;
+  }
+
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-coin"></div>
+    <div class="logo-text">
+      <span class="logo-name">CoinSight</span>
+      <span class="logo-sub">YOLOv8 · 10 Peso Detector</span>
+    </div>
+  </div>
+  <div class="mode-badge {% if mode == 'live' %}live{% else %}demo{% endif %}">
+    <div class="dot"></div>
+    {{ 'Live model' if mode == 'live' else 'Demo mode' }}
+  </div>
+</header>
+
+<!-- Main -->
+<main>
+
+  <!-- Mode Tabs -->
+  <div style="grid-column: 1/-1; margin: 0 -40px 0 -40px; padding: 0 40px; border-bottom: 1px solid var(--border);">
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="image">📷 Image</button>
+      <button class="mode-tab" data-mode="video">🎬 Video</button>
+      <button class="mode-tab" data-mode="camera">📹 Camera</button>
+    </div>
+  </div>
+
+  <!-- Upload / Result area -->
+  <div id="upload-area-wrapper">
+    <!-- Loading overlay (shared) -->
+    <div id="loading-overlay">
+      <div class="spinner-ring"></div>
+      <p>ANALYSING...</p>
+    </div>
+
+    <!-- Image Mode -->
+    <div id="image-mode" class="mode-content">
+      <div class="upload-area" id="image-upload-area">
+        <input type="file" id="image-input" accept=".png,.jpg,.jpeg,.webp,.bmp" />
+
+        <!-- Idle -->
+        <div id="image-idle-state">
+          <div class="coin-icon"></div>
+          <h2>Drop an image here</h2>
+          <p>or <span class="browse-link">browse files</span></p>
+          <div class="formats">
+            <span>PNG</span><span>JPG</span><span>WEBP</span><span>BMP</span>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div id="image-result-state" style="display:none;">
+          <img id="image-result-img" src="" alt="Detection result" />
+          <div class="result-bar">
+            <div class="result-bar-info">
+              <span id="image-result-summary">—</span>
+            </div>
+            <button class="btn-clear" id="image-btn-clear">✕ CLEAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Mode -->
+    <div id="video-mode" class="mode-content" style="display:none;">
+      <div class="upload-area" id="video-upload-area">
+        <input type="file" id="video-input" accept=".mp4,.avi,.mov,.mkv,.flv,.webm" />
+
+        <!-- Idle -->
+        <div id="video-idle-state">
+          <div class="coin-icon"></div>
+          <h2>Drop a video here</h2>
+          <p>or <span class="browse-link">browse files</span></p>
+          <div class="formats">
+            <span>MP4</span><span>AVI</span><span>MOV</span><span>MKV</span><span>WEBM</span>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div id="video-result-state" style="display:none; width: 100%;">
+          <img id="video-preview" src="" alt="Video frame" />
+          <div class="video-info">
+            <div>Frames processed: <strong id="video-frame-count">0</strong></div>
+            <div>Total detections: <strong id="video-total-detections">0</strong></div>
+            <div>FPS: <strong id="video-fps">0</strong></div>
+          </div>
+          <div id="video-frames-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; padding: 20px; border-top: 1px solid var(--border);"></div>
+          <div class="result-bar">
+            <button class="btn-clear" id="video-btn-clear">✕ CLEAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Mode -->
+    <div id="camera-mode" class="mode-content" style="display:none;">
+      <div class="upload-area" id="camera-upload-area" style="flex-direction: column;">
+        <!-- Idle -->
+        <div id="camera-idle-state">
+          <div class="coin-icon"></div>
+          <h2>Live Camera Detection</h2>
+          <p>Works on laptop webcam and mobile devices</p>
+          <button id="camera-start-btn" style="padding: 10px 20px; background: rgba(74,222,128,.1); border: 1px solid var(--new); color: var(--new); border-radius: 6px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: .75rem;">Start Camera</button>
+        </div>
+
+        <!-- Stream -->
+        <div id="camera-stream-state" style="display:none; width: 100%;">
+          <canvas id="camera-canvas"></canvas>
+          <div class="camera-controls">
+            <button id="camera-stop-btn" class="btn-camera stop">⏹ STOP</button>
+          </div>
+          <div class="video-info">
+            <div>Live detections: <strong id="camera-live-count">0</strong></div>
+            <div>Inference time: <strong id="camera-inference-time">0 ms</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Detections -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Detections</span>
+        <span class="panel-count" id="det-count">0</span>
+      </div>
+      <div id="detections-list">
+        <div class="det-placeholder">No image analysed yet</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="panel">
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <span class="stat-label">Total coins</span>
+          <span class="stat-value" id="stat-total">—</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Inference</span>
+          <span class="stat-value small" id="stat-time">—</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">New ₱10</span>
+          <span class="stat-value" id="stat-new" style="color:var(--new)">—</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Old ₱10</span>
+          <span class="stat-value" id="stat-old" style="color:var(--old)">—</span>
+        </div>
+      </div>
+      <!-- Grand Total -->
+      <div style="background: linear-gradient(135deg, rgba(196,156,40,.08), rgba(240,200,66,.04)); border-top: 1px solid var(--border); padding: 18px 20px; text-align: center;">
+        <div style="font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px;">Grand Total Value</div>
+        <div style="font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; color: var(--gold2); letter-spacing: -.02em;" id="stat-grandtotal">₱—</div>
+      </div>
+    </div>
+
+    <!-- Model info -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Model Info</span>
+      </div>
+      <div class="info-rows">
+        <div class="info-row">
+          <span class="info-key">Architecture</span>
+          <span class="info-val">YOLOv8m</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Classes</span>
+          <span class="info-val">New · Old ₱10</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Train images</span>
+          <span class="info-val">617 (×3 aug)</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Epochs</span>
+          <span class="info-val">50</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Model file</span>
+          <span class="info-val">coin_model.pkl</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Status</span>
+          <span class="info-val" id="model-status">{{ 'LOADED ✓' if mode == 'live' else 'DEMO MODE' }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Footer -->
+<footer>
+  <span>YOLOv8m · Fine-tuned on 617 images · CC BY 4.0</span>
+  <a href="https://roboflow.com" target="_blank">Roboflow ↗</a>
+</footer>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+// ── Mode Management ────────────────────────────────────────────────────────
+const modeTabs = document.querySelectorAll('.mode-tab');
+const modeContents = document.querySelectorAll('.mode-content');
+const loading = document.getElementById('loading-overlay');
+let currentMode = 'image';
+
+modeTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    currentMode = mode;
+    
+    // Update tabs
+    modeTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    // Update content
+    modeContents.forEach(content => content.style.display = 'none');
+    document.getElementById(`${mode}-mode`).style.display = 'block';
+    
+    // Reset camera if switching away
+    if (mode !== 'camera' && cameraActive) {
+      stopCamera();
+    }
+  });
+});
+
+// ── IMAGE MODE ────────────────────────────────────────────────────────────
+const imageUploadArea = document.getElementById('image-upload-area');
+const imageInput = document.getElementById('image-input');
+const imageIdleState = document.getElementById('image-idle-state');
+const imageResultState = document.getElementById('image-result-state');
+const imageResultImg = document.getElementById('image-result-img');
+const detList = document.getElementById('detections-list');
+const detCount = document.getElementById('det-count');
+const imageBtnClear = document.getElementById('image-btn-clear');
+const imageResultSummary = document.getElementById('image-result-summary');
+
+// Image drag-and-drop
+imageUploadArea.addEventListener('dragover', e => { e.preventDefault(); imageUploadArea.classList.add('drag-over'); });
+imageUploadArea.addEventListener('dragleave', () => imageUploadArea.classList.remove('drag-over'));
+imageUploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  imageUploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    imageInput.files = e.dataTransfer.files;
+    processImageFile(file);
+  } else {
+    alert('Please drop an image file');
+  }
+});
+
+imageUploadArea.addEventListener('click', (e) => {
+  if (e.target !== imageInput) imageInput.click();
+});
+
+imageInput.addEventListener('change', e => {
+  if (e.target.files[0]) processImageFile(e.target.files[0]);
+});
+
+imageBtnClear.addEventListener('click', resetImageUI);
+
+async function processImageFile(file) {
+  loading.classList.add('active');
+  imageIdleState.style.display = 'none';
+  imageResultState.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('image', file);
+  
+  // Get the upload-area width dynamically
+  const uploadAreaWidth = imageUploadArea.offsetWidth;
+  fd.append('target_width', uploadAreaWidth);
+
+  try {
+    const res = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Prediction failed');
+    renderImageResult(data);
+  } catch (err) {
+    alert('Error: ' + err.message);
+    resetImageUI();
+  } finally {
+    loading.classList.remove('active');
+  }
+}
+
+function renderImageResult(data) {
+  imageResultImg.src = 'data:image/jpeg;base64,' + data.image_b64;
+  imageResultState.style.display = 'block';
+
+  const ms = data.inference_time_ms;
+  imageResultSummary.innerHTML =
+    `<strong>${data.count}</strong> coin${data.count !== 1 ? 's' : ''} detected &nbsp;·&nbsp; <strong>${ms} ms</strong>`;
+
+  updateStats(data);
+}
+
+function resetImageUI() {
+  imageInput.value = '';
+  imageResultImg.src = '';
+  imageResultState.style.display = 'none';
+  imageIdleState.style.display = 'flex';
+  detList.innerHTML = '<div class="det-placeholder">No image analysed yet</div>';
+  detCount.textContent = '0';
+  ['stat-total','stat-time','stat-new','stat-old','stat-grandtotal'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = id === 'stat-grandtotal' ? '₱—' : '—';
+  });
+  imageResultSummary.textContent = '—';
+}
+
+// ── VIDEO MODE ────────────────────────────────────────────────────────────
+const videoUploadArea = document.getElementById('video-upload-area');
+const videoInput = document.getElementById('video-input');
+const videoIdleState = document.getElementById('video-idle-state');
+const videoResultState = document.getElementById('video-result-state');
+const videoPreview = document.getElementById('video-preview');
+const videoFrameCount = document.getElementById('video-frame-count');
+const videoTotalDetections = document.getElementById('video-total-detections');
+const videoFps = document.getElementById('video-fps');
+const videoFramesGrid = document.getElementById('video-frames-grid');
+const videoBtnClear = document.getElementById('video-btn-clear');
+
+// Video drag-and-drop
+videoUploadArea.addEventListener('dragover', e => { e.preventDefault(); videoUploadArea.classList.add('drag-over'); });
+videoUploadArea.addEventListener('dragleave', () => videoUploadArea.classList.remove('drag-over'));
+videoUploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  videoUploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && (file.type.startsWith('video/') || file.name.match(/\.(mp4|avi|mov|mkv|webm|flv)$/i))) {
+    videoInput.files = e.dataTransfer.files;
+    processVideoFile(file);
+  } else {
+    alert('Please drop a video file');
+  }
+});
+
+videoUploadArea.addEventListener('click', (e) => {
+  if (e.target !== videoInput) videoInput.click();
+});
+
+videoInput.addEventListener('change', e => {
+  if (e.target.files[0]) processVideoFile(e.target.files[0]);
+});
+
+videoBtnClear.addEventListener('click', resetVideoUI);
+
+async function processVideoFile(file) {
+  loading.classList.add('active');
+  videoIdleState.style.display = 'none';
+  videoResultState.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('video', file);
+
+  try {
+    const res = await fetch('/video-upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Video processing failed');
+    renderVideoResult(data);
+  } catch (err) {
+    alert('Error: ' + err.message);
+    resetVideoUI();
+  } finally {
+    loading.classList.remove('active');
+  }
+}
+
+function renderVideoResult(data) {
+  if (data.summary_frames.length === 0) {
+    alert('No frames could be processed');
+    return;
+  }
+
+  // Show first frame
+  const firstFrame = data.summary_frames[0];
+  videoPreview.src = 'data:image/jpeg;base64,' + firstFrame.frame_b64;
+  videoFrameCount.textContent = data.total_frames_processed;
+  videoTotalDetections.textContent = data.total_detections;
+  videoFps.textContent = Math.round(data.fps);
+
+  // Show thumbnail grid
+  videoFramesGrid.innerHTML = '';
+  data.summary_frames.forEach((frame, idx) => {
+    const thumb = document.createElement('div');
+    thumb.style.cssText = 'position: relative; overflow: hidden; border-radius: 8px; cursor: pointer; background: var(--border);';
+    thumb.innerHTML = `
+      <img src="data:image/jpeg;base64,${frame.frame_b64}" style="width: 100%; height: 80px; object-fit: cover;">
+      <div style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.7); padding: 2px 6px; border-radius: 4px; font-size: .6rem; color: var(--gold);">
+        ${frame.count} detection${frame.count !== 1 ? 's' : ''}
+      </div>
+    `;
+    thumb.addEventListener('click', () => {
+      videoPreview.src = 'data:image/jpeg;base64,' + frame.frame_b64;
+      updateStats(frame);
+    });
+    videoFramesGrid.appendChild(thumb);
+  });
+
+  videoResultState.style.display = 'block';
+  updateStats(firstFrame);
+}
+
+function resetVideoUI() {
+  videoInput.value = '';
+  videoPreview.src = '';
+  videoIdleState.style.display = 'block';
+  videoResultState.style.display = 'none';
+  videoFramesGrid.innerHTML = '';
+  detList.innerHTML = '<div class="det-placeholder">No image analysed yet</div>';
+  detCount.textContent = '0';
+  ['stat-total','stat-time','stat-new','stat-old','stat-grandtotal'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = id === 'stat-grandtotal' ? '₱—' : '—';
+  });
+}
+
+// ── CAMERA MODE ────────────────────────────────────────────────────────────
+const cameraStartBtn = document.getElementById('camera-start-btn');
+const cameraStopBtn = document.getElementById('camera-stop-btn');
+const cameraIdleState = document.getElementById('camera-idle-state');
+const cameraStreamState = document.getElementById('camera-stream-state');
+const cameraCanvas = document.getElementById('camera-canvas');
+const cameraLiveCount = document.getElementById('camera-live-count');
+const cameraInferenceTime = document.getElementById('camera-inference-time');
+
+let cameraActive = false;
+let videoStream = null;
+let socket = null;
+
+// Initialize WebSocket connection
+function initializeSocket() {
+  if (!socket) {
+    socket = io();
+    socket.on('connect', () => console.log('Socket connected'));
+    socket.on('camera:processed', handleCameraFrame);
+    socket.on('camera:error', err => console.error('Camera error:', err));
+  }
+}
+
+cameraStartBtn.addEventListener('click', startCamera);
+cameraStopBtn.addEventListener('click', stopCamera);
+
+async function startCamera() {
+  try {
+    // Check if mediaDevices is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const errorMsg = window.location.protocol === 'https:' 
+        ? 'Camera API not supported in your browser'
+        : 'Camera requires HTTPS or localhost connection. Please use https:// or access via localhost:5000';
+      alert('Error accessing camera: ' + errorMsg);
+      console.error('mediaDevices not available:', navigator.mediaDevices);
+      return;
+    }
+
+    initializeSocket();
+    videoStream = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+    });
+    cameraActive = true;
+
+    cameraIdleState.style.display = 'none';
+    cameraStreamState.style.display = 'block';
+
+    const video = document.createElement('video');
+    video.srcObject = videoStream;
+    video.play();
+
+    socket.emit('camera:start', {});
+
+    const ctx = cameraCanvas.getContext('2d');
+    cameraCanvas.width = 640;
+    cameraCanvas.height = 480;
+
+    // Initial draw
+    video.onloadedmetadata = () => {
+      cameraCanvas.width = Math.min(video.videoWidth, 1280);
+      cameraCanvas.height = (cameraCanvas.width / video.videoWidth) * video.videoHeight;
+    };
+
+    const frameInterval = setInterval(() => {
+      if (!cameraActive) {
+        clearInterval(frameInterval);
+        return;
+      }
+
+      ctx.drawImage(video, 0, 0, cameraCanvas.width, cameraCanvas.height);
+      const frameData = cameraCanvas.toDataURL('image/jpeg', 0.8);
+      socket.emit('camera:frame', { frame_data: frameData });
+    }, 100); // Send frame every 100ms (~10 FPS)
+
+  } catch (err) {
+    let errorMsg = err.message;
+    
+    // Provide user-friendly error messages
+    if (err.name === 'NotAllowedError') {
+      errorMsg = 'Camera access was denied. Please allow camera access in your browser settings.';
+    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      errorMsg = 'No camera device found on this system.';
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorMsg = 'Camera is already in use or cannot be accessed. Try closing other apps using the camera.';
+    } else if (err.name === 'SecurityError') {
+      errorMsg = 'Camera access denied for security reasons. Ensure you\'re using HTTPS or localhost.';
+    }
+    
+    alert('Error accessing camera: ' + errorMsg);
+    console.error('Camera error:', err);
+  }
+}
+
+function handleCameraFrame(data) {
+  if (!cameraActive) return;
+
+  const ctx = cameraCanvas.getContext('2d');
+  const img = new Image();
+  img.src = 'data:image/jpeg;base64,' + data.frame_b64;
+  img.onload = () => {
+    ctx.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+    ctx.drawImage(img, 0, 0);
+  };
+
+  cameraLiveCount.textContent = data.count;
+  cameraInferenceTime.textContent = Math.round(data.inference_time_ms) + ' ms';
+  updateStats(data);
+}
+
+function stopCamera() {
+  cameraActive = false;
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+    videoStream = null;
+  }
+  if (socket) {
+    socket.emit('camera:stop', {});
+  }
+  cameraStreamState.style.display = 'none';
+  cameraIdleState.style.display = 'block';
+  cameraLiveCount.textContent = '0';
+  cameraInferenceTime.textContent = '0 ms';
+  detList.innerHTML = '<div class="det-placeholder">No image analysed yet</div>';
+  detCount.textContent = '0';
+  ['stat-total','stat-time','stat-new','stat-old','stat-grandtotal'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = id === 'stat-grandtotal' ? '₱—' : '—';
+  });
+}
+
+// ── Shared Stats Update ────────────────────────────────────────────────────
+function updateStats(data) {
+  const dets = data.detections || [];
+  const nNew = dets.filter(d => d.label.toLowerCase().includes('new')).length;
+  const nOld = dets.filter(d => d.label.toLowerCase().includes('old')).length;
+
+  document.getElementById('stat-total').textContent = data.count;
+  document.getElementById('stat-time').textContent = (data.inference_time_ms || 0) + ' ms';
+  document.getElementById('stat-new').textContent = nNew;
+  document.getElementById('stat-old').textContent = nOld;
+  document.getElementById('stat-grandtotal').textContent = '₱' + (data.count * 10);
+  detCount.textContent = data.count;
+
+  // Detection cards
+  if (dets.length === 0) {
+    detList.innerHTML = '<div class="det-placeholder">No coins detected</div>';
+    return;
+  }
+
+  detList.innerHTML = '';
+  dets.forEach((d, i) => {
+    const isNew = d.label.toLowerCase().includes('new');
+    const cls = isNew ? 'new-coin' : 'old-coin';
+    const icon = isNew ? 'NEW' : 'OLD';
+    const [x1, y1, x2, y2] = d.bbox;
+    const card = document.createElement('div');
+    card.className = `det-card ${cls}`;
+    card.style.animationDelay = (i * 60) + 'ms';
+    card.innerHTML = `
+      <div class="det-coin-icon">${icon}</div>
+      <div class="det-info">
+        <div class="det-label">${d.label}</div>
+        <div class="det-conf-row">
+          <div class="det-conf-bar">
+            <div class="det-conf-fill" style="width:${d.confidence}%"></div>
+          </div>
+          <span class="det-conf-pct">${d.confidence.toFixed(1)}%</span>
+        </div>
+        <div class="det-bbox">[${x1}, ${y1}, ${x2}, ${y2}]</div>
+      </div>`;
+    detList.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
