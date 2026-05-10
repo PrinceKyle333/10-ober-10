@@ -14,6 +14,8 @@ from PIL import Image
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.utils import secure_filename
+import logging
+import socket
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # Increased for video uploads
@@ -476,11 +478,31 @@ def handle_disconnect():
     print(f"[INFO] Client disconnected: {camera_id}")
 
 
+def find_available_port(preferred_port=5000, max_port=5100):
+    """Return the first available port starting from preferred_port."""
+    for port in range(preferred_port, max_port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(('0.0.0.0', port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"No available port found in range {preferred_port}-{max_port - 1}")
+
+
 if __name__ == '__main__':
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+
+    preferred_port = int(os.environ.get('PORT', 5000))
+    port = find_available_port(preferred_port)
+    if port != preferred_port:
+        print(f"[WARN] Port {preferred_port} is already in use; falling back to {port}.")
+
     socketio.run(
         app,
         debug=True,
         host='0.0.0.0',
-        port=5000,
+        port=port,
         use_reloader=False,
     )
